@@ -13,9 +13,11 @@ OWN=' \nPNBRQK'
 V={'P':100,'N':300,'B':320,'R':500,'Q':950,'K':0}
 LIM=25000
 MATE=99999
-T={}
+T={};PC={}
+PK=str.maketrans('NBRQnbrq','........')
 
 def tables(ph):
+ global PH;PH=ph;PC.clear()
  # piece-square tables (value included), tapered once per root by phase
  # ph: 1.0 = full middlegame material, 0.0 = bare endgame
  for p in V:
@@ -36,6 +38,27 @@ def tables(ph):
   T[p]=t
 
 def rot(b):return b[::-1].swapcase()
+
+def side(b):
+ # pawn structure and king shelter of the upper-case side
+ v=0;k=b.find('K');C=['']+[b[c+20:100:10]for c in range(1,9)]+['']
+ for f in range(1,9):
+  F=C[f];t=F.find('P')
+  while t>=0:
+   if'p'not in C[f-1][:t]+F[:t]+C[f+1][:t]:v+=(0,0,8,14,24,40,64)[7-t]*(2-PH)
+   if'P'in F[:t]:v-=12
+   if'P'not in C[f-1]+C[f+1]:v-=10
+   t=F.find('P',t+1)
+ if k>80:
+  for f in(-1,0,1):
+   if b[k+f-10]!='P'and b[k+f-20]!='P':v-=18*PH
+ return round(v)
+
+def ev(pos):
+ # full static score: piece-square sum plus the (cached) structure term
+ b=pos[0].translate(PK);v=PC.get(b)
+ if v is None:v=PC[b]=side(b)-side(rot(b))
+ return pos[1]+v
 
 def att(b,s):
  # is square s attacked by a lower-case (opponent) piece?
@@ -129,7 +152,7 @@ class Search:
   b=pos[0];kk=b.find('K');chk=att(b,kk);kk*=not chk
   if chk:best=-MATE+ply;ms=list(gen(pos))
   else:
-   best=pos[1]
+   best=ev(pos)
    if best>=bt or ply>60:return best
    if best>a:a=best
    ms=list(gen(pos,1))
@@ -138,7 +161,7 @@ class Search:
    if not chk and b[m[1]]!='.'and not m[2]:
     j=m[1];x=V[b[j].upper()]
     # delta pruning, and skip a capture a defending pawn wins back at a loss
-    if pos[1]+x+200<a or V[b[m[0]]]>x+50 and(b[j-11]=='p'or b[j-9]=='p'):continue
+    if best+x+200<a or V[b[m[0]]]>x+50 and(b[j-11]=='p'or b[j-9]=='p'):continue
    np=mk(pos,m,kk)
    if not np:continue
    v=-s.qs(np,-bt,-a,ply+1)
@@ -163,8 +186,9 @@ class Search:
    if es<500-MATE:es+=ply
    if ed>=d and ply and(ef==0 or ef==1 and es>=bt or ef==2 and es<=a):return es
   # reverse futility: far above beta near the leaves, trust the static score
-  if not chk and bt-a==1 and d<4 and pos[1]-110*d>=bt:return pos[1]
-  if nul and not chk and d>2 and pos[1]>=bt and abs(bt)<MATE-500 and any(c in b for c in'NBRQ'):
+  se=ev(pos)
+  if not chk and bt-a==1 and d<4 and se-110*d>=bt:return se
+  if nul and not chk and d>2 and se>=bt and abs(bt)<MATE-500 and any(c in b for c in'NBRQ'):
    v=-s.go((rot(b),-pos[1],pos[3],pos[2],0),d-3,-bt,1-bt,ply+1,0)
    if v>=bt:return v
   k=s.kill.get(ply)
@@ -184,7 +208,7 @@ class Search:
     if not np:continue
     n+=1;q=b[m[1]]=='.'and not m[2]
     # futility: a quiet move cannot lift a hopeless frontier node
-    if n>1 and q and d<3 and not chk and pos[1]+120*d<=a:continue
+    if n>1 and q and d<3 and not chk and se+120*d<=a:continue
     if n==1:v=-s.go(np,d-1,-bt,-a,ply+1)
     else:
      r=1 if d>2 and n>3 and q and not chk else 0

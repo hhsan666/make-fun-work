@@ -8,26 +8,29 @@ OWN=' \nPNBRQK'
 V={'P':100,'N':300,'B':320,'R':500,'Q':950,'K':0}
 LIM=350000
 MATE=99999
-T={};PC={}
+TW={'N':3,'B':1,'R':2,'Q':4}
+T=[{},{}];PC={}
 PK=str.maketrans('NBRQnbrq','........')
 
-def tables(ph):
+def tables(ph,K=(0,0)):
  global PH;PH=ph;PC.clear()
- for p in V:
-  t=[0]*120
-  for r in range(8):
-   for c in range(8):
-    k=r+1;fx=abs(c-3.5);fy=abs(r-3.5);m=fx+fy;rk=7-r
-    if p=='P':
-     wg=c<3 or c>4
-     v=(0,0,3,8,16,30,55,0)[rk]*(2-ph)*(1-.8*ph*wg)+(c in(3,4))*(1<rk<5)*14*ph-(c in(3,4))*(rk<2)*10*ph+wg*(rk==1)*10*ph-wg*(rk>2)*8*ph
-    elif p=='N':v=18-7*m-(rk==0)*8
-    elif p=='B':v=10-3*m-(rk==0)*6
-    elif p=='R':v=(rk==6)*18+(c in(3,4))*(rk==0)*6
-    elif p=='Q':v=4-2*m
-    else:v=ph*((rk==0)*(20,30,10,0,0,10,30,20)[c]-rk*16)+(1-ph)*(28-9*m)
-    t[k*10+10+c+1]=V[p]+round(v)
-  T[p]=t
+ for x in(0,1):
+  for p in V:
+   t=[0]*120;e=K[x]
+   for r in range(8):
+    for c in range(8):
+     k=r+1;fx=abs(c-3.5);fy=abs(r-3.5);m=fx+fy;rk=7-r
+     if p=='P':
+      wg=c<3 or c>4
+      v=(0,0,3,8,16,30,55,0)[rk]*(2-ph)*(1-.8*ph*wg)+(c in(3,4))*(1<rk<5)*14*ph-(c in(3,4))*(rk<2)*10*ph+wg*(rk==1)*10*ph-wg*(rk>2)*8*ph
+     elif p=='N':v=18-7*m-(rk==0)*8
+     elif p=='B':v=10-3*m-(rk==0)*6
+     elif p=='R':v=(rk==6)*18+(c in(3,4))*(rk==0)*6
+     elif p=='Q':v=4-2*m
+     else:v=ph*((rk==0)*(20,30,10,0,0,10,30,20)[c]-rk*16)+(1-ph)*(28-9*m)
+     if e and p in TW:v+=ph*TW[p]*(7-max(abs(r+2-e//10),abs(c+1-e%10)))
+     t[k*10+10+c+1]=V[p]+round(v)
+   T[x][p]=t
 
 def rot(b):return b[::-1].swapcase()
 
@@ -62,7 +65,7 @@ def att(b,s):
  return 0
 
 def gen(pos,c=0):
- b,_,wc,bc,ep=pos
+ b,_,wc,bc,ep,_=pos
  for x in re.finditer('[PNBRQK]',b):
   i=x.start();p=b[i]
   if p=='P':
@@ -95,25 +98,25 @@ def gen(pos,c=0):
 def put(b,i,p):return b[:i]+p+b[i+1:]
 
 def mk(pos,m,k=0):
- b,sc,wc,bc,ep=pos;i,j,pr=m;p=b[i];q=b[j]
+ b,sc,wc,bc,ep,sd=pos;i,j,pr=m;p=b[i];q=b[j];o=T[1-sd]
  nb=b[:i]+'.'+b[i+1:j]+(pr or p)+b[j+1:]if i<j else b[:j]+(pr or p)+b[j+1:i]+'.'+b[i+1:]
- t=T[p];v=t[j]-t[i];ne=0
+ t=T[sd][p];v=t[j]-t[i];ne=0
  if p=='K':
   wc=(0,0)
   if abs(j-i)==2:
-   r=91 if j<i else 98;nb=put(put(nb,r,'.'),(i+j)//2,'R');v+=T['R'][(i+j)//2]-T['R'][r]
+   r=91 if j<i else 98;nb=put(put(nb,r,'.'),(i+j)//2,'R');t=T[sd]['R'];v+=t[(i+j)//2]-t[r]
  elif p=='P':
-  if pr:v+=T[pr][j]-t[j]
+  if pr:v+=T[sd][pr][j]-t[j]
   if j-i==N+N:ne=119-i-N
-  if j==ep:nb=put(nb,j+S,'.');v+=T['P'][119-j-S]
+  if j==ep:nb=put(nb,j+S,'.');v+=o['P'][119-j-S]
  x=i-k
  if(not k or p=='K'or j==ep or i//10==k//10 or x%10==0 or x%9==0 or x%11==0)and att(nb,nb.find('K')):return None
- if q!='.':v+=T[q.upper()][119-j]
+ if q!='.':v+=o[q.upper()][119-j]
  if i==91:wc=(0,wc[1])
  if i==98:wc=(wc[0],0)
  if j==21:bc=(bc[0],0)
  if j==28:bc=(0,bc[1])
- return(rot(nb),-sc-v,bc,wc,ne)
+ return(rot(nb),-sc-v,bc,wc,ne,1-sd)
 
 def legal(pos):return[m for m in gen(pos)if mk(pos,m)]
 
@@ -162,7 +165,7 @@ class Search:
   se=0 if chk else ev(pos)
   if not chk and bt-a==1 and d<4 and se-110*d>=bt:return se
   if nul and not chk and d>2 and se>=bt and abs(bt)<MATE-500 and any(c in b for c in'NBRQ'):
-   v=-s.go((rot(b),-pos[1],pos[3],pos[2],0),d-3,-bt,1-bt,ply+1,0)
+   v=-s.go((rot(b),-pos[1],pos[3],pos[2],0,1-pos[5]),d-3,-bt,1-bt,ply+1,0)
    if v>=bt:return v
   k=s.kill.get(ply)
   def key(m):
@@ -170,7 +173,7 @@ class Search:
    if q!='.':return-1e5-V[q.upper()]*10+V[b[i]]
    if pr:return-9e4-V[pr]
    if m==k:return-8e4
-   t=T[b[i]];return t[i]-t[j]-s.h.get((b[i],j),0)
+   t=T[pos[5]][b[i]];return t[i]-t[j]-s.h.get((b[i],j),0)
   def mv():
    if tm:yield tm
    L=sorted(gen(pos),key=key);s.n+=len(L)//2
@@ -222,16 +225,16 @@ def parse(f):
  w=side=='w'
  e=0
  if ep!='-':e=10*(10-int(ep[1]))+'abcdefgh'.index(ep[0])+1
- pos=(b,0,('Q'in cs,'K'in cs),('k'in cs,'q'in cs),e)
- if not w:pos=(rot(b),0,pos[3],pos[2],119-e if e else 0)
+ pos=(b,0,('Q'in cs,'K'in cs),('k'in cs,'q'in cs),e,0)
+ if not w:pos=(rot(b),0,pos[3],pos[2],119-e if e else 0,0)
  return pos,w
 
 def score(b):
- return sum(T[p][i]for i,p in enumerate(b)if p.isupper())-sum(T[p.upper()][119-i]for i,p in enumerate(b)if p.islower())
+ return sum(T[0][p][i]for i,p in enumerate(b)if p.isupper())-sum(T[1][p.upper()][119-i]for i,p in enumerate(b)if p.islower())
 
 def think(fen,start,moves,legal_uci):
  ph=sum(V[c.upper()]for c in fen.split()[0]if c in'nbrqNBRQ')
- tables(min(ph,6400)/6400)
+ b=parse(fen)[0][0];tables(min(ph,6400)/6400,(b.find('k'),119-b.find('K')))
  p,w=parse(start);hist={}
  for u in moves:
   hist[p[0]]=1

@@ -59,6 +59,28 @@ for fen,d,_ in CASES:
  good=capsame(root(fen)[0],2);ok&=good
  print(f"caps-gen {'OK ' if good else 'BAD'} {fen}")
 
+# the incremental score must equal a full recount after any move sequence
+def fullscore(pos):
+ b,sd=pos[0],pos[5] if len(pos)>5 else 0
+ T=e.T if isinstance(e.T,dict) else None
+ if T is not None:return e.score(b)
+ return sum(e.T[sd][p][i] for i,p in enumerate(b) if p.isupper())-sum(e.T[1-sd][p.upper()][119-i] for i,p in enumerate(b) if p.islower())
+def inc_ok():
+ import random
+ rnd=random.Random(5)
+ for fen,_,_ in CASES:
+  p,w=e.parse(fen);b=p[0]
+  try:e.tables(0.6,(b.find('k'),119-b.find('K')))
+  except TypeError:e.tables(0.6)
+  p=(p[0],e.score(p[0]))+p[2:]
+  for _ in range(60):
+   ms=[m for m in e.gen(p) if e.mk(p,m)]
+   if not ms:break
+   p=e.mk(p,rnd.choice(ms))
+   if p[1]!=fullscore(p):return False
+ return True
+good=inc_ok();ok&=good;print(('OK  ' if good else 'BAD ')+'incremental score = full recount')
+
 def best(fen,moves=(),lim=20000):
  e.LIM=lim
  return e.think(fen,fen,[],legal_uci(fen))

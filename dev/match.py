@@ -34,7 +34,9 @@ def unit(engine,u,opps,offset,port):
  json.dump({'schema':'tiny-chess-01/gauntlet/v1','house_seed':'%064x'%(u+1),'max_plies':200,'adjudication_margin':5,'move_limit_ms':10000,'games':games},open(d+'/data/gauntlet.json','w'))
  env=dict(os.environ,MAKEFUN_STATE_DIR=d+'/state',MAKEFUN_ENV_DATA_DIR=d+'/data',MAKEFUN_ENV_PORT=str(port))
  srv=subprocess.Popen(['node',SERVER],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
- while not os.path.exists(d+'/state/ready'):time.sleep(0.05)
+ while not os.path.exists(d+'/state/ready'):
+  if srv.poll() is not None:raise SystemExit('env failed to start (port in use?)')
+  time.sleep(0.05)
  t=time.time()
  r=subprocess.run(['python3','-P','-s',engine],env=dict(os.environ,MAKEFUN_ENV_URL=f'http://127.0.0.1:{port}'),capture_output=True,text=True)
  wall=time.time()-t
@@ -51,10 +53,10 @@ def unit(engine,u,opps,offset,port):
 def main():
  ap=argparse.ArgumentParser()
  ap.add_argument('engine');ap.add_argument('--units',type=int,default=4);ap.add_argument('--jobs',type=int,default=4)
- ap.add_argument('--opp',default='depth-2,depth-3,depth-4,nodes-100k,nodes-250k,nodes-500k');ap.add_argument('--offset',type=int,default=0)
+ ap.add_argument('--opp',default='depth-2,depth-3,depth-4,nodes-100k,nodes-250k,nodes-500k');ap.add_argument('--offset',type=int,default=0);ap.add_argument('--port',type=int,default=18100)
  a=ap.parse_args();opps=a.opp.split(',')
  with ThreadPoolExecutor(a.jobs) as ex:
-  outs=list(ex.map(lambda u:unit(os.path.abspath(a.engine),u,opps,a.offset,18100+u),range(a.units)))
+  outs=list(ex.map(lambda u:unit(os.path.abspath(a.engine),u,opps,a.offset,a.port+u),range(a.units)))
  allg=[];mx=0
  per={o:[0,0] for o in opps}
  for res,tmax,tavg,wall,rc,err in outs:

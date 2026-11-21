@@ -177,12 +177,15 @@ class Search:
   k=s.kill.get(ply)
   def key(m):
    i,j,pr=m;q=b[j]
-   if m==tm:return-1e9
    if q!='.':return-1e5-V[q.upper()]*10+V[b[i]]
    if pr:return-9e4-V[pr]
    if m==k:return-8e4
    t=T[b[i]];return t[i]-t[j]-s.h.get((b[i],j),0)
-  ms=sorted(gen(pos),key=key)
+  def mv():
+   if tm:yield tm
+   for m in sorted(gen(pos),key=key):
+    if m!=tm:yield m
+  ms=mv()
   best=-MATE;bm=None;n=0
   s.rep[b]=1
   try:

@@ -22,7 +22,7 @@ def elo(games):
   else:hi=m
  return round((lo+hi)/2)
 
-def unit(engine,u,opps,offset,port):
+def unit(engine,u,opps,offset,port,save=''):
  games=[]
  k=0
  for o in opps:
@@ -42,6 +42,7 @@ def unit(engine,u,opps,offset,port):
  wall=time.time()-t
  srv.send_signal(signal.SIGTERM);srv.wait()
  st=json.load(open(d+'/state/export/state.json'))
+ if save:os.makedirs(save,exist_ok=True);json.dump(st,open(f'{save}/unit{u}.json','w'))
  think=[json.loads(l)['think_ms'] for l in open(d+'/state/calls.ndjson') if '"/move"' in l]
  think=[x for x in think if x is not None]
  res=[]
@@ -53,10 +54,10 @@ def unit(engine,u,opps,offset,port):
 def main():
  ap=argparse.ArgumentParser()
  ap.add_argument('engine');ap.add_argument('--units',type=int,default=4);ap.add_argument('--jobs',type=int,default=4)
- ap.add_argument('--opp',default='depth-2,depth-3,depth-4,nodes-100k,nodes-250k,nodes-500k');ap.add_argument('--offset',type=int,default=0);ap.add_argument('--port',type=int,default=18100)
+ ap.add_argument('--opp',default='depth-2,depth-3,depth-4,nodes-100k,nodes-250k,nodes-500k');ap.add_argument('--offset',type=int,default=0);ap.add_argument('--port',type=int,default=18100);ap.add_argument('--save',default='')
  a=ap.parse_args();opps=a.opp.split(',')
  with ThreadPoolExecutor(a.jobs) as ex:
-  outs=list(ex.map(lambda u:unit(os.path.abspath(a.engine),u,opps,a.offset,a.port+u),range(a.units)))
+  outs=list(ex.map(lambda u:unit(os.path.abspath(a.engine),u,opps,a.offset,a.port+u,a.save),range(a.units)))
  allg=[];mx=0
  per={o:[0,0] for o in opps}
  for res,tmax,tavg,wall,rc,err in outs:

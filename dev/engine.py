@@ -182,14 +182,14 @@ class Search:
   try:
    for m in ms:
     q=b[m[1]]=='.'and not m[2]
-    if n and q and not chk and(d<3 and se+120*d<=a or d<4 and n>2+d*d and bt-a==1):continue
     np=mk(pos,m,kk);s.n+=2
     if not np:continue
+    if n and q and not chk and(d<3 and se+120*d<=a or d<4 and n>2+d*d and bt-a==1)and not att(np[0],np[0].find('K')):continue
     n+=1
     if n==1:v=-s.go(np,d-1,-bt,-a,ply+1)
     else:
-     r=1 if d>2 and n>3 and q and not chk else 0
-     if r and n>9 and d>4:r=2
+     r=1 if d>1 and n>2 and q and not chk else 0
+     if r and n>6 and d>3:r=2+(n>15 and d>5)
      v=-s.go(np,d-1-r,-a-1,-a,ply+1)
      if v>a and(r or v<bt):v=-s.go(np,d-1,-bt,-a,ply+1)
     if v>best:

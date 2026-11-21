@@ -6,7 +6,7 @@ NJ=(N+N+E,E+N+E,E+S+E,S+S+E,S+S+W,W+S+W,W+N+W,N+N+W)
 D={'N':NJ,'B':B4,'R':R4,'Q':K8,'K':K8}
 OWN=' \nPNBRQK'
 V={'P':100,'N':300,'B':320,'R':500,'Q':950,'K':0}
-LIM=370000
+LIM=350000
 MATE=99999
 T={};PC={}
 PK=str.maketrans('NBRQnbrq','........')

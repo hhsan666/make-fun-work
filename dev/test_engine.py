@@ -46,6 +46,16 @@ for fen,d,want in CASES:
  good=n==want;ok&=good
  print(f"perft {'OK ' if good else 'BAD'} d{d} {n} (want {want}) {time.time()-t:.1f}s  {fen}")
 
+# capture-only generation (quiescence) must equal the filtered full generation
+def capsame(pos,d):
+ full=[m for m in e.gen(pos) if pos[0][m[1]]!='.' or m[2]=='Q' or (m[1]==pos[4] and pos[0][m[0]]=='P')]
+ if sorted(full)!=sorted(e.gen(pos,1)):return False
+ if d==0:return True
+ return all(capsame(np,d-1) for m in e.gen(pos) for np in [e.mk(pos,m)] if np)
+for fen,d,_ in CASES:
+ good=capsame(root(fen)[0],2);ok&=good
+ print(f"caps-gen {'OK ' if good else 'BAD'} {fen}")
+
 def best(fen,moves=(),lim=20000):
  e.LIM=lim
  return e.think(fen,fen,[],legal_uci(fen))

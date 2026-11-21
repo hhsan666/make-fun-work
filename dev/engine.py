@@ -4,11 +4,12 @@
 # swapcased). Search: negamax alpha-beta, PVS, TT, null move, LMR, killers,
 # quiescence (captures/promotions; all evasions when in check), iterative
 # deepening under a fixed node budget. No clock, no randomness.
-import json,os,sys,urllib.request as U
+import json,os,re,sys,urllib.request as U
 N,E,S,W=-10,1,10,-1
 R4=(N,E,S,W);B4=(N+E,S+E,S+W,N+W);K8=R4+B4
 NJ=(N+N+E,E+N+E,E+S+E,S+S+E,S+S+W,W+S+W,W+N+W,N+N+W)
 D={'N':NJ,'B':B4,'R':R4,'Q':K8,'K':K8}
+OWN=' \nPNBRQK'
 V={'P':100,'N':300,'B':320,'R':500,'Q':950,'K':0}
 LIM=25000
 MATE=99999
@@ -48,35 +49,37 @@ def att(b,s):
   if q=='q' or q==('r' if d in R4 else 'b'):return 1
  return 0
 
-def gen(pos):
+def gen(pos,c=0):
+ # pseudo-legal moves; c=1: captures and promotions only (quiescence)
  b,_,wc,bc,ep=pos
- for i,p in enumerate(b):
-  if not p.isupper():continue
+ for x in re.finditer('[PNBRQK]',b):
+  i=x.start();p=b[i]
   if p=='P':
    L=[]
-   if b[i+N]=='.':
+   if b[i+N]=='.'and(not c or i<39):
     L.append(i+N)
-    if 80<i<89 and b[i+N+N]=='.':L.append(i+N+N)
+    if 80<i<89 and b[i+N+N]=='.'and not c:L.append(i+N+N)
    for j in(i+N+W,i+N+E):
     if b[j].islower() or j==ep:L.append(j)
    for j in L:
     if j<29:
-     for pr in'QNRB':yield(i,j,pr)
+     for pr in'QNRB'[:4-3*(c and b[j]=='.')]:yield(i,j,pr)
     else:yield(i,j,'')
    continue
   for d in D[p]:
    j=i+d
    while 1:
     q=b[j]
-    if q.isspace() or q.isupper():break
-    yield(i,j,'')
-    if q!='.' or p in'NK':break
+    if q in OWN:break
+    if q!='.':yield(i,j,'');break
+    if not c:yield(i,j,'')
+    if p in'NK':break
     j+=d
-  if p=='K':
-   for c,ok in((91,wc[0]),(98,wc[1])):
-    if ok and b[c]=='R':
-     d=1 if c>i else-1
-     if all(b[x]=='.'for x in range(i+d,c,d))and not att(b,i)and not att(b,i+d):yield(i,i+d+d,'')
+  if p=='K'and not c:
+   for r,ok in((91,wc[0]),(98,wc[1])):
+    if ok and b[r]=='R':
+     d=1 if r>i else-1
+     if all(b[x]=='.'for x in range(i+d,r,d))and not att(b,i)and not att(b,i+d):yield(i,i+d+d,'')
 
 def put(b,i,p):return b[:i]+p+b[i+1:]
 
@@ -126,7 +129,7 @@ class Search:
    best=pos[1]
    if best>=bt or ply>60:return best
    if best>a:a=best
-   ms=[m for m in gen(pos)if b[m[1]]!='.'or m[2]=='Q'or m[1]==pos[4]]
+   ms=list(gen(pos,1))
   ms.sort(key=lambda m:-V[b[m[1]].upper()]*10+V[b[m[0]]]-(m[2]=='Q')*900 if b[m[1]]!='.'else-(m[2]=='Q')*900)
   for m in ms:
    if not chk and b[m[1]]!='.'and not m[2]:

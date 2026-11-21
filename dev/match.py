@@ -4,7 +4,7 @@
 # usage: python3 dev/match.py ENGINE.py [--units N] [--jobs J] [--opp a,b,..] [--offset K]
 import argparse,json,os,re,subprocess,sys,tempfile,time,signal,math
 from concurrent.futures import ThreadPoolExecutor
-KIT=os.environ.get('KIT',os.path.expanduser('~/work/kit/tiny-chess-01-kit'))
+KIT=os.environ.get('KIT',os.path.expanduser('~/work/kit33/tiny-chess-01-kit'))
 SERVER=os.path.join(KIT,'program/env/server.mjs')
 ANCH={'depth-2':855,'depth-3':1073,'depth-4':1199,'nodes-100k':1392,'nodes-250k':1497,'nodes-500k':1596,'nodes-1M':1667,'nodes-2M':1712}
 src=open(SERVER).read()

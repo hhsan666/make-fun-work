@@ -23,7 +23,9 @@ def tables(ph):
    for c in range(8):
     k=r+1;fx=abs(c-3.5);fy=abs(r-3.5);m=fx+fy;rk=7-r
     if p=='P':
-     v=(0,0,3,8,16,30,55,0)[rk]*(2-ph)+(c in(3,4))*(1<rk<5)*14*ph-(c in(3,4))*(rk<2)*10*ph
+     # wing pawns (king shelter) keep still in the middlegame
+     wg=c<3 or c>4
+     v=(0,0,3,8,16,30,55,0)[rk]*(2-ph)*(1-.8*ph*wg)+(c in(3,4))*(1<rk<5)*14*ph-(c in(3,4))*(rk<2)*10*ph+wg*(rk==1)*10*ph-wg*(rk>2)*8*ph
     elif p=='N':v=18-7*m-(rk==0)*8
     elif p=='B':v=10-3*m-(rk==0)*6
     elif p=='R':v=(rk==6)*18+(c in(3,4))*(rk==0)*6

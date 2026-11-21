@@ -12,7 +12,8 @@ bytes.
   castling pairs swapped. Rotation mirrors files, so every table is symmetric
   left-right.
 - Position tuple: (board, score, own castling (a1-rook, h1-rook),
-  their castling, en-passant square in the mover's coordinates or 0).
+  their castling, en-passant square in the mover's coordinates or 0,
+  side: 0 = the root's side to move, 1 = the other; it picks the table set).
 
 ## Moves
 - `gen(pos, c)`: pseudo-legal moves; `c=1` yields only captures and
@@ -29,21 +30,29 @@ bytes.
   (non-pawn material / 6400). King: back-rank shelter squares in the
   middlegame, centralisation in the endgame. Pawns: advance bonus, centre
   pawns, wing (shelter) pawns held back in the middlegame.
+- King tropism: at the root, each side's N/B/R/Q tables get a bonus for
+  Chebyshev closeness to the enemy king's root square (weights `TW`,
+  middlegame weight), so the two sides use different tables (`T[0]`, `T[1]`).
 - `ev(pos)`: PST score kept incrementally + a structure term cached on the
   pawn/king placement: passed pawns by rank (doubled in the endgame),
   doubled -12, isolated -10, king shelter -18 per missing pawn in front of a
   back-rank king (middlegame weight).
 
 ## Search
-- Negamax alpha-beta with PVS, iterative deepening, fixed node budget `LIM`
-  (search + quiescence nodes); when the budget runs out the search raises
+- Negamax alpha-beta with PVS, iterative deepening, fixed work budget `LIM`
+  in units fitted to this machine's time (main node 8, quiescence node that
+  generates captures 22, made move 2, generated main-search move 1/2;
+  about 1 us each), so the slowest moves stay close to the average; when the budget runs out the search raises
   `Stop` and the best root move of the last completed (or improved) iteration
   is played. No clock anywhere.
 - Transposition table (cleared every move, so a position and its game history
   alone decide the move), killer per ply, history heuristic, MVV-LVA.
+- The TT move is tried before the other moves are generated.
 - Check extension, null move (R=2, not in check, with pieces), reverse
-  futility (d<4, non-PV), futility for quiet moves (d<3), LMR (1 ply after the
-  3rd move at d>2, 2 plies after the 9th at d>4).
+  futility (d<4, non-PV), futility for quiet moves (d<3), late move pruning
+  (d<4, non-PV, after 3+d*d moves); neither prunes a move that gives check.
+  LMR: 1 ply for quiet moves after the 2nd at d>1, 2 after the 6th at d>3,
+  3 after the 15th at d>5.
 - Quiescence: stand pat, captures and promotions with delta pruning and a
   skip for captures a defending pawn wins back at a loss; in check, every
   evasion (mate detected).

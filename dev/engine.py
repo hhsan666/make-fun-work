@@ -1,9 +1,4 @@
-# tiny-chess-01 engine (MIT). Source of main.py: packed by `makefun compress`.
-# Board: 120-char string, 10x12 mailbox, always seen from the side to move
-# (upper case = side to move); after each move it is rotated (reversed and
-# swapcased). Search: negamax alpha-beta, PVS, TT, null move, LMR, killers,
-# quiescence (captures/promotions; all evasions when in check), iterative
-# deepening under a fixed node budget. No clock, no randomness.
+# tiny-chess-01 engine (MIT); design notes in dev/NOTES.md
 import json,os,re,sys,urllib.request as U
 N,E,S,W=-10,1,10,-1
 R4=(N,E,S,W);B4=(N+E,S+E,S+W,N+W);K8=R4+B4
@@ -18,15 +13,12 @@ PK=str.maketrans('NBRQnbrq','........')
 
 def tables(ph):
  global PH;PH=ph;PC.clear()
- # piece-square tables (value included), tapered once per root by phase
- # ph: 1.0 = full middlegame material, 0.0 = bare endgame
  for p in V:
   t=[0]*120
   for r in range(8):
    for c in range(8):
     k=r+1;fx=abs(c-3.5);fy=abs(r-3.5);m=fx+fy;rk=7-r
     if p=='P':
-     # wing pawns (king shelter) keep still in the middlegame
      wg=c<3 or c>4
      v=(0,0,3,8,16,30,55,0)[rk]*(2-ph)*(1-.8*ph*wg)+(c in(3,4))*(1<rk<5)*14*ph-(c in(3,4))*(rk<2)*10*ph+wg*(rk==1)*10*ph-wg*(rk>2)*8*ph
     elif p=='N':v=18-7*m-(rk==0)*8
@@ -40,7 +32,6 @@ def tables(ph):
 def rot(b):return b[::-1].swapcase()
 
 def side(b):
- # pawn structure and king shelter of the upper-case side
  v=0;k=b.find('K');C=['']+[b[c+20:100:10]for c in range(1,9)]+['']
  for f in range(1,9):
   F=C[f];t=F.find('P')
@@ -55,13 +46,11 @@ def side(b):
  return round(v)
 
 def ev(pos):
- # full static score: piece-square sum plus the (cached) structure term
  b=pos[0].translate(PK);v=PC.get(b)
  if v is None:v=PC[b]=side(b)-side(rot(b))
  return pos[1]+v
 
 def att(b,s):
- # is square s attacked by a lower-case (opponent) piece?
  if b[s-11]=='p' or b[s-9]=='p':return 1
  for d in NJ:
   if b[s+d]=='n':return 1
@@ -73,7 +62,6 @@ def att(b,s):
  return 0
 
 def gen(pos,c=0):
- # pseudo-legal moves; c=1: captures and promotions only (quiescence)
  b,_,wc,bc,ep=pos
  for x in re.finditer('[PNBRQK]',b):
   i=x.start();p=b[i]
@@ -118,9 +106,6 @@ def val(pos,m):
  return s
 
 def mk(pos,m,k=0):
- # make a pseudo-legal move; None if it leaves our king attacked.
- # k: our king's square when not in check; a move off every line through it
- # cannot expose the king, so its test is skipped
  b,sc,wc,bc,ep=pos;i,j,pr=m;p=b[i]
  v=val(pos,m)
  nb=put(put(b,j,pr or p),i,'.');ne=0
@@ -160,7 +145,6 @@ class Search:
   for m in ms:
    if not chk and b[m[1]]!='.'and not m[2]:
     j=m[1];x=V[b[j].upper()]
-    # delta pruning, and skip a capture a defending pawn wins back at a loss
     if best+x+200<a or V[b[m[0]]]>x+50 and(b[j-11]=='p'or b[j-9]=='p'):continue
    np=mk(pos,m,kk)
    if not np:continue
@@ -185,7 +169,6 @@ class Search:
    if es>MATE-500:es-=ply
    if es<500-MATE:es+=ply
    if ed>=d and ply and(ef==0 or ef==1 and es>=bt or ef==2 and es<=a):return es
-  # reverse futility: far above beta near the leaves, trust the static score
   se=ev(pos)
   if not chk and bt-a==1 and d<4 and se-110*d>=bt:return se
   if nul and not chk and d>2 and se>=bt and abs(bt)<MATE-500 and any(c in b for c in'NBRQ'):
@@ -207,7 +190,6 @@ class Search:
     np=mk(pos,m,kk)
     if not np:continue
     n+=1;q=b[m[1]]=='.'and not m[2]
-    # futility: a quiet move cannot lift a hopeless frontier node
     if n>1 and q and d<3 and not chk and se+120*d<=a:continue
     if n==1:v=-s.go(np,d-1,-bt,-a,ply+1)
     else:
@@ -255,7 +237,6 @@ def score(b):
 def think(fen,start,moves,legal_uci):
  ph=sum(V[c.upper()]for c in fen.split()[0]if c in'nbrqNBRQ')
  tables(min(ph,6400)/6400)
- # repetition history from the game so far
  p,w=parse(start);hist={}
  for u in moves:
   hist[p[0]]=1

@@ -1,4 +1,4 @@
-# tiny-chess-01 engine (MIT); design notes in dev/NOTES.md
+# tiny-chess-01 chess engine (MIT); design notes: dev/NOTES.md
 import json,os,re,sys,urllib.request as U
 N,E,S,W=-10,1,10,-1
 R4=(N,E,S,W);B4=(N+E,S+E,S+W,N+W);K8=R4+B4
@@ -7,7 +7,7 @@ D={'N':NJ,'B':B4,'R':R4,'Q':K8,'K':K8}
 OWN=' \nPNBRQK'
 V={'P':100,'N':300,'B':320,'R':500,'Q':950,'K':0}
 VL={**V,**{k.lower():v for k,v in V.items()}}
-LIM=375000
+LIM=360000
 MATE=99999
 T={};PC={}
 RX=re.compile('[PNBRQK]').finditer

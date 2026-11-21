@@ -6,7 +6,7 @@ NJ=(N+N+E,E+N+E,E+S+E,S+S+E,S+S+W,W+S+W,W+N+W,N+N+W)
 D={'N':NJ,'B':B4,'R':R4,'Q':K8,'K':K8}
 OWN=' \nPNBRQK'
 V={'P':100,'N':300,'B':320,'R':500,'Q':950,'K':0}
-LIM=110000
+LIM=370000
 MATE=99999
 T={};PC={}
 PK=str.maketrans('NBRQnbrq','........')
@@ -94,34 +94,25 @@ def gen(pos,c=0):
 
 def put(b,i,p):return b[:i]+p+b[i+1:]
 
-def val(pos,m):
- b=pos[0];i,j,pr=m;p=b[i];q=b[j];t=T[p]
- s=t[j]-t[i]
- if q!='.':s+=T[q.upper()][119-j]
- if p=='K' and abs(j-i)==2:
-  r=91 if j<i else 98;s+=T['R'][(i+j)//2]-T['R'][r]
- if p=='P':
-  if pr:s+=T[pr][j]-t[j]
-  if j==pos[4]:s+=T['P'][119-j-S]
- return s
-
 def mk(pos,m,k=0):
- b,sc,wc,bc,ep=pos;i,j,pr=m;p=b[i]
- v=val(pos,m)
- nb=put(put(b,j,pr or p),i,'.');ne=0
+ b,sc,wc,bc,ep=pos;i,j,pr=m;p=b[i];q=b[j]
+ nb=b[:i]+'.'+b[i+1:j]+(pr or p)+b[j+1:]if i<j else b[:j]+(pr or p)+b[j+1:i]+'.'+b[i+1:]
+ t=T[p];v=t[j]-t[i];ne=0
+ if p=='K':
+  wc=(0,0)
+  if abs(j-i)==2:
+   r=91 if j<i else 98;nb=put(put(nb,r,'.'),(i+j)//2,'R');v+=T['R'][(i+j)//2]-T['R'][r]
+ elif p=='P':
+  if pr:v+=T[pr][j]-t[j]
+  if j-i==N+N:ne=119-i-N
+  if j==ep:nb=put(nb,j+S,'.');v+=T['P'][119-j-S]
+ x=i-k
+ if(not k or p=='K'or j==ep or i//10==k//10 or x%10==0 or x%9==0 or x%11==0)and att(nb,nb.find('K')):return None
+ if q!='.':v+=T[q.upper()][119-j]
  if i==91:wc=(0,wc[1])
  if i==98:wc=(wc[0],0)
  if j==21:bc=(bc[0],0)
  if j==28:bc=(0,bc[1])
- if p=='K':
-  wc=(0,0)
-  if abs(j-i)==2:
-   r=91 if j<i else 98;nb=put(put(nb,r,'.'),(i+j)//2,'R')
- if p=='P':
-  if j-i==N+N:ne=119-i-N
-  if j==ep:nb=put(nb,j+S,'.')
- x=i-k
- if(not k or p=='K'or j==ep or i//10==k//10 or x%10==0 or x%9==0 or x%11==0)and att(nb,nb.find('K')):return None
  return(rot(nb),-sc-v,bc,wc,ne)
 
 def legal(pos):return[m for m in gen(pos)if mk(pos,m)]
@@ -132,7 +123,6 @@ class Search:
  def __init__(s,hist):
   s.tt={};s.kill={};s.h={};s.n=0;s.rep=dict(hist)
  def qs(s,pos,a,bt,ply):
-  s.n+=2
   if s.n>LIM:raise Stop
   b=pos[0];kk=b.find('K');chk=att(b,kk);kk*=not chk
   if chk:best=-MATE+ply;ms=list(gen(pos))
@@ -141,12 +131,12 @@ class Search:
    if best>=bt or ply>60:return best
    if best>a:a=best
    ms=list(gen(pos,1))
-  s.n+=3;ms.sort(key=lambda m:-V[b[m[1]].upper()]*10+V[b[m[0]]]-(m[2]=='Q')*900 if b[m[1]]!='.'else-(m[2]=='Q')*900)
+  s.n+=22;ms.sort(key=lambda m:-V[b[m[1]].upper()]*10+V[b[m[0]]]-(m[2]=='Q')*900 if b[m[1]]!='.'else-(m[2]=='Q')*900)
   for m in ms:
    if not chk and b[m[1]]!='.'and not m[2]:
     j=m[1];x=V[b[j].upper()]
     if best+x+200<a or V[b[m[0]]]>x+50 and(b[j-11]=='p'or b[j-9]=='p'):continue
-   np=mk(pos,m,kk);s.n+=1
+   np=mk(pos,m,kk);s.n+=2
    if not np:continue
    v=-s.qs(np,-bt,-a,ply+1)
    if v>best:
@@ -156,7 +146,7 @@ class Search:
      if v>=bt:break
   return best
  def go(s,pos,d,a,bt,ply,nul=1):
-  s.n+=2
+  s.n+=8
   if s.n>LIM:raise Stop
   b=pos[0]
   if ply and s.rep.get(b):return 0
@@ -183,17 +173,19 @@ class Search:
    t=T[b[i]];return t[i]-t[j]-s.h.get((b[i],j),0)
   def mv():
    if tm:yield tm
-   for m in sorted(gen(pos),key=key):
+   L=sorted(gen(pos),key=key);s.n+=len(L)//2
+   for m in L:
     if m!=tm:yield m
   ms=mv()
   best=-MATE;bm=None;n=0
   s.rep[b]=1
   try:
    for m in ms:
-    np=mk(pos,m,kk);s.n+=1
+    q=b[m[1]]=='.'and not m[2]
+    if n and q and not chk and(d<3 and se+120*d<=a or d<4 and n>2+d*d and bt-a==1):continue
+    np=mk(pos,m,kk);s.n+=2
     if not np:continue
-    n+=1;q=b[m[1]]=='.'and not m[2]
-    if n>1 and q and d<3 and not chk and se+120*d<=a:continue
+    n+=1
     if n==1:v=-s.go(np,d-1,-bt,-a,ply+1)
     else:
      r=1 if d>2 and n>3 and q and not chk else 0

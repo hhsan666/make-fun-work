@@ -116,7 +116,7 @@ class Stop(Exception):pass
 
 class Search:
  def __init__(s,hist):
-  s.tt={};s.kill={};s.n=0;s.rep=dict(hist)
+  s.tt={};s.kill={};s.h={};s.n=0;s.rep=dict(hist)
  def qs(s,pos,a,bt,ply):
   s.n+=1
   if s.n>LIM:raise Stop
@@ -129,7 +129,10 @@ class Search:
    ms=[m for m in gen(pos)if b[m[1]]!='.'or m[2]=='Q'or m[1]==pos[4]]
   ms.sort(key=lambda m:-V[b[m[1]].upper()]*10+V[b[m[0]]]-(m[2]=='Q')*900 if b[m[1]]!='.'else-(m[2]=='Q')*900)
   for m in ms:
-   if not chk and b[m[1]]!='.'and pos[1]+V[b[m[1]].upper()]+200<a and not m[2]:continue
+   if not chk and b[m[1]]!='.'and not m[2]:
+    j=m[1];x=V[b[j].upper()]
+    # delta pruning, and skip a capture a defending pawn wins back at a loss
+    if pos[1]+x+200<a or V[b[m[0]]]>x+50 and(b[j-11]=='p'or b[j-9]=='p'):continue
    np=mk(pos,m)
    if not np:continue
    v=-s.qs(np,-bt,-a,ply+1)
@@ -165,7 +168,7 @@ class Search:
    if q!='.':return-1e5-V[q.upper()]*10+V[b[i]]
    if pr:return-9e4-V[pr]
    if m==k:return-8e4
-   t=T[b[i]];return t[i]-t[j]
+   t=T[b[i]];return t[i]-t[j]-s.h.get((b[i],j),0)
   ms=sorted(gen(pos),key=key)
   best=-MATE;bm=None;n=0
   s.rep[b]=1
@@ -174,6 +177,8 @@ class Search:
     np=mk(pos,m)
     if not np:continue
     n+=1;q=b[m[1]]=='.'and not m[2]
+    # futility: a quiet move cannot lift a hopeless frontier node
+    if n>1 and q and d<3 and not chk and pos[1]+120*d<=a:continue
     if n==1:v=-s.go(np,d-1,-bt,-a,ply+1)
     else:
      r=1 if d>2 and n>3 and q and not chk else 0
@@ -186,7 +191,7 @@ class Search:
      if v>a:
       a=v
       if v>=bt:
-       if q:s.kill[ply]=m
+       if q:s.kill[ply]=m;y=(b[m[0]],m[1]);s.h[y]=s.h.get(y,0)+d*d
        break
   finally:
    del s.rep[b]

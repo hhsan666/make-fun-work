@@ -94,8 +94,10 @@ def val(pos,m):
   if j==pos[4]:s+=T['P'][119-j-S]
  return s
 
-def mk(pos,m):
- # make a pseudo-legal move; None if it leaves our king attacked
+def mk(pos,m,k=0):
+ # make a pseudo-legal move; None if it leaves our king attacked.
+ # k: our king's square when not in check; a move off every line through it
+ # cannot expose the king, so its test is skipped
  b,sc,wc,bc,ep=pos;i,j,pr=m;p=b[i]
  v=val(pos,m)
  nb=put(put(b,j,pr or p),i,'.');ne=0
@@ -110,7 +112,8 @@ def mk(pos,m):
  if p=='P':
   if j-i==N+N:ne=119-i-N
   if j==ep:nb=put(nb,j+S,'.')
- if att(nb,nb.find('K')):return None
+ x=i-k
+ if(not k or p=='K'or j==ep or i//10==k//10 or x%10==0 or x%9==0 or x%11==0)and att(nb,nb.find('K')):return None
  return(rot(nb),-sc-v,bc,wc,ne)
 
 def legal(pos):return[m for m in gen(pos)if mk(pos,m)]
@@ -123,7 +126,7 @@ class Search:
  def qs(s,pos,a,bt,ply):
   s.n+=1
   if s.n>LIM:raise Stop
-  b=pos[0];chk=att(b,b.find('K'))
+  b=pos[0];kk=b.find('K');chk=att(b,kk);kk*=not chk
   if chk:best=-MATE+ply;ms=list(gen(pos))
   else:
    best=pos[1]
@@ -136,7 +139,7 @@ class Search:
     j=m[1];x=V[b[j].upper()]
     # delta pruning, and skip a capture a defending pawn wins back at a loss
     if pos[1]+x+200<a or V[b[m[0]]]>x+50 and(b[j-11]=='p'or b[j-9]=='p'):continue
-   np=mk(pos,m)
+   np=mk(pos,m,kk)
    if not np:continue
    v=-s.qs(np,-bt,-a,ply+1)
    if v>best:
@@ -150,7 +153,7 @@ class Search:
   if s.n>LIM:raise Stop
   b=pos[0]
   if ply and s.rep.get(b):return 0
-  chk=att(b,b.find('K'))
+  kk=b.find('K');chk=att(b,kk);kk*=not chk
   if chk:d+=1
   if d<=0:return s.qs(pos,a,bt,ply)
   a0=a;e=s.tt.get(pos);tm=None
@@ -177,7 +180,7 @@ class Search:
   s.rep[b]=1
   try:
    for m in ms:
-    np=mk(pos,m)
+    np=mk(pos,m,kk)
     if not np:continue
     n+=1;q=b[m[1]]=='.'and not m[2]
     # futility: a quiet move cannot lift a hopeless frontier node

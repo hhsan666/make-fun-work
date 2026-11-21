@@ -14,9 +14,9 @@ e=type('E',(),g)
 
 def perft(pos,d):
  if d==0:return 1
- n=0
+ n=0;k=pos[0].find('K');k*=not e.att(pos[0],k)
  for m in e.gen(pos):
-  np=e.mk(pos,m)
+  np=e.mk(pos,m,k)
   if np:n+=1 if d==1 else perft(np,d-1)
  return n
 

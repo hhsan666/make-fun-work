@@ -10,6 +10,8 @@ Sunfish 4k baseline on the 6-game practice trials (RULES.txt, "The house baselin
 bench (dev/bench.py, 8 middlegame positions): LIM 10000 worst 0.227s; 20000 worst 0.404s; 25000 worst 0.444s.
 | v6 (9affcfd, LIM 21000 nodes) | 21000 | 1364 | 1279 | 1279 | 1307 | 743 / 540 / 632 | finished, replay matched; slowest moves in multi-queen / mating positions |
 
+| v14 (LIM 350000 work units) | 350000 | 1654 | 1451 | 1545 | 1550 | 681 / 688 / 953 | finished, replay matched, 0 time losses; avg think 483/459/512 ms in docker; the slowest positions take 0.36-0.52 s re-timed outside docker (trial 2 ran ~2x slower) |
+
 ## Local matches (dev/match.py, kit env + house engines, process driver)
 6 opponents (depth-2 .. nodes-500k) x 2 colours x 8 units = 96 games, offset 0 (same openings for every row). Elo = the scorer's formula on all games.
 
@@ -24,3 +26,7 @@ bench (dev/bench.py, 8 middlegame positions): LIM 10000 worst 0.227s; 20000 wors
 | v12 | v10 + stronger LMR | 60.0/96 | 1407 |
 
 Doubling the search is worth about +200 Elo here, so speed / search efficiency comes first.
+| v13 | v10, but futility/LMP never prune a move that gives check | 60.5/96 | 1413 |
+| v14 | v13 + stronger LMR | 64.0/96 | 1451 |
+
+v14 timing (dev tcal, LIM 350000, outside docker): middlegame worst 0.436 s mean 0.388 s; game positions worst 0.543 s; hard set worst 0.440 s.

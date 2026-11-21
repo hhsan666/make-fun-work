@@ -50,6 +50,9 @@ for fen,d,want in CASES:
 def capsame(pos,d):
  full=[m for m in e.gen(pos) if pos[0][m[1]]!='.' or m[2]=='Q' or (m[1]==pos[4] and pos[0][m[0]]=='P')]
  if sorted(full)!=sorted(e.gen(pos,1)):return False
+ if 'cap' in g:
+  c=list(e.cap(pos[0],pos[4]))
+  if len(c)!=len(set(c)) or set(c)!={m for m in e.gen(pos,1) if m[2] in('','Q')}:return False
  if d==0:return True
  return all(capsame(np,d-1) for m in e.gen(pos) for np in [e.mk(pos,m)] if np)
 for fen,d,_ in CASES:

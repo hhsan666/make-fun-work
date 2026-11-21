@@ -1,8 +1,9 @@
 # Time a move on representative middlegame positions at a node budget.
-# usage: python3 dev/bench.py [LIM] [engine path]
+# usage: python3 dev/bench.py [LIM] [engine path] [--hard]
 import sys,time,os
-lim=int(sys.argv[1]) if len(sys.argv)>1 else 10000
-path=sys.argv[2] if len(sys.argv)>2 else os.path.join(os.path.dirname(__file__),'engine.py')
+A=[x for x in sys.argv[1:] if x!='--hard']
+lim=int(A[0]) if A else 10000
+path=A[1] if len(A)>1 else os.path.join(os.path.dirname(__file__),'engine.py')
 g={'__name__':'bench'};exec(compile(open(path).read(),path,'exec'),g)
 FENS=[
  'r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1',
@@ -14,6 +15,15 @@ FENS=[
  '3r1rk1/p4ppp/1qp1b3/4p3/4P3/1PN1QP2/P5PP/2RR2K1 b - - 0 20',
  'r1b2rk1/2q1bppp/p2p1n2/np2p3/3PP3/5N1P/PPBN1PP1/R1BQR1K1 w - - 0 13',
 ]
+# slowest positions seen in grade-local games (heavy material, many checks)
+HARD=[
+ '8/P7/P5R1/4K3/1Q2Q3/8/8/3k4 w - - 0 1',
+ 'Q4Q2/P7/P5R1/4K3/8/3k4/8/8 w - - 0 1',
+ '2rk3r/1p2bQp1/8/p3P1Bp/1p6/6P1/PPq4P/R4RK1 w - - 0 1',
+ '4k3/8/6P1/3Q2B1/8/1p2P3/1P3P2/6K1 w - - 0 1',
+ 'r1bq1rk1/1p2b2p/4p2Q/3pNpp1/1ppP4/4P1P1/PPP1BP1P/R3R1K1 w - - 0 1',
+]
+if '--hard' in sys.argv:FENS=HARD
 worst=0;tot=0
 for f in FENS:
  legal=None

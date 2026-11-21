@@ -6,7 +6,7 @@ NJ=(N+N+E,E+N+E,E+S+E,S+S+E,S+S+W,W+S+W,W+N+W,N+N+W)
 D={'N':NJ,'B':B4,'R':R4,'Q':K8,'K':K8}
 OWN=' \nPNBRQK'
 V={'P':100,'N':300,'B':320,'R':500,'Q':950,'K':0}
-LIM=25000
+LIM=110000
 MATE=99999
 T={};PC={}
 PK=str.maketrans('NBRQnbrq','........')
@@ -48,7 +48,7 @@ def side(b):
 def ev(pos):
  b=pos[0].translate(PK);v=PC.get(b)
  if v is None:v=PC[b]=side(b)-side(rot(b))
- return pos[1]+v
+ b=pos[0];return pos[1]+v+30*((b.count('B')>1)-(b.count('b')>1))
 
 def att(b,s):
  if b[s-11]=='p' or b[s-9]=='p':return 1
@@ -132,7 +132,7 @@ class Search:
  def __init__(s,hist):
   s.tt={};s.kill={};s.h={};s.n=0;s.rep=dict(hist)
  def qs(s,pos,a,bt,ply):
-  s.n+=1
+  s.n+=2
   if s.n>LIM:raise Stop
   b=pos[0];kk=b.find('K');chk=att(b,kk);kk*=not chk
   if chk:best=-MATE+ply;ms=list(gen(pos))
@@ -141,12 +141,12 @@ class Search:
    if best>=bt or ply>60:return best
    if best>a:a=best
    ms=list(gen(pos,1))
-  ms.sort(key=lambda m:-V[b[m[1]].upper()]*10+V[b[m[0]]]-(m[2]=='Q')*900 if b[m[1]]!='.'else-(m[2]=='Q')*900)
+  s.n+=3;ms.sort(key=lambda m:-V[b[m[1]].upper()]*10+V[b[m[0]]]-(m[2]=='Q')*900 if b[m[1]]!='.'else-(m[2]=='Q')*900)
   for m in ms:
    if not chk and b[m[1]]!='.'and not m[2]:
     j=m[1];x=V[b[j].upper()]
     if best+x+200<a or V[b[m[0]]]>x+50 and(b[j-11]=='p'or b[j-9]=='p'):continue
-   np=mk(pos,m,kk)
+   np=mk(pos,m,kk);s.n+=1
    if not np:continue
    v=-s.qs(np,-bt,-a,ply+1)
    if v>best:
@@ -156,7 +156,7 @@ class Search:
      if v>=bt:break
   return best
  def go(s,pos,d,a,bt,ply,nul=1):
-  s.n+=1
+  s.n+=2
   if s.n>LIM:raise Stop
   b=pos[0]
   if ply and s.rep.get(b):return 0
@@ -187,7 +187,7 @@ class Search:
   s.rep[b]=1
   try:
    for m in ms:
-    np=mk(pos,m,kk)
+    np=mk(pos,m,kk);s.n+=1
     if not np:continue
     n+=1;q=b[m[1]]=='.'and not m[2]
     if n>1 and q and d<3 and not chk and se+120*d<=a:continue

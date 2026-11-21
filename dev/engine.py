@@ -6,9 +6,12 @@ NJ=(N+N+E,E+N+E,E+S+E,S+S+E,S+S+W,W+S+W,W+N+W,N+N+W)
 D={'N':NJ,'B':B4,'R':R4,'Q':K8,'K':K8}
 OWN=' \nPNBRQK'
 V={'P':100,'N':300,'B':320,'R':500,'Q':950,'K':0}
-LIM=350000
+VL={**V,**{k.lower():v for k,v in V.items()}}
+LIM=375000
 MATE=99999
 T={};PC={}
+RX=re.compile('[PNBRQK]').finditer
+KA=[(d,'r')for d in R4]+[(d,'b')for d in B4]
 PK=str.maketrans('NBRQnbrq','........')
 
 def tables(ph):
@@ -27,7 +30,7 @@ def tables(ph):
     elif p=='Q':v=4-2*m
     else:v=ph*((rk==0)*(20,30,10,0,0,10,30,20)[c]-rk*16)+(1-ph)*(28-9*m)
     t[k*10+10+c+1]=V[p]+round(v)
-  T[p]=t
+  T[p]=T[p.lower()]=t
 
 def rot(b):return b[::-1].swapcase()
 
@@ -54,16 +57,16 @@ def att(b,s):
  if b[s-11]=='p' or b[s-9]=='p':return 1
  for d in NJ:
   if b[s+d]=='n':return 1
- for d in K8:
+ for d,t in KA:
   k=s+d;q=b[k]
   if q=='k':return 1
   while q=='.':k+=d;q=b[k]
-  if q=='q' or q==('r' if d in R4 else 'b'):return 1
+  if q=='q'or q==t:return 1
  return 0
 
 def gen(pos,c=0):
  b,_,wc,bc,ep=pos
- for x in re.finditer('[PNBRQK]',b):
+ for x in RX(b):
   i=x.start();p=b[i]
   if p=='P':
    L=[]
@@ -108,7 +111,7 @@ def mk(pos,m,k=0):
   if j==ep:nb=put(nb,j+S,'.');v+=T['P'][119-j-S]
  x=i-k
  if(not k or p=='K'or j==ep or i//10==k//10 or x%10==0 or x%9==0 or x%11==0)and att(nb,nb.find('K')):return None
- if q!='.':v+=T[q.upper()][119-j]
+ if q!='.':v+=T[q][119-j]
  if i==91:wc=(0,wc[1])
  if i==98:wc=(wc[0],0)
  if j==21:bc=(bc[0],0)
@@ -131,10 +134,10 @@ class Search:
    if best>=bt or ply>60:return best
    if best>a:a=best
    ms=list(gen(pos,1))
-  s.n+=22;ms.sort(key=lambda m:-V[b[m[1]].upper()]*10+V[b[m[0]]]-(m[2]=='Q')*900 if b[m[1]]!='.'else-(m[2]=='Q')*900)
+  s.n+=22;ms.sort(key=lambda m:-VL[b[m[1]]]*10+V[b[m[0]]]-(m[2]=='Q')*900 if b[m[1]]!='.'else-(m[2]=='Q')*900)
   for m in ms:
    if not chk and b[m[1]]!='.'and not m[2]:
-    j=m[1];x=V[b[j].upper()]
+    j=m[1];x=VL[b[j]]
     if best+x+200<a or V[b[m[0]]]>x+50 and(b[j-11]=='p'or b[j-9]=='p'):continue
    np=mk(pos,m,kk);s.n+=2
    if not np:continue
@@ -167,7 +170,7 @@ class Search:
   k=s.kill.get(ply)
   def key(m):
    i,j,pr=m;q=b[j]
-   if q!='.':return-1e5-V[q.upper()]*10+V[b[i]]
+   if q!='.':return-1e5-VL[q]*10+V[b[i]]
    if pr:return-9e4-V[pr]
    if m==k:return-8e4
    t=T[b[i]];return t[i]-t[j]-s.h.get((b[i],j),0)

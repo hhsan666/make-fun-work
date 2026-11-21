@@ -1,0 +1,256 @@
+# tiny-chess-01 engine (MIT). Source of main.py: packed by `makefun compress`.
+# Board: 120-char string, 10x12 mailbox, always seen from the side to move
+# (upper case = side to move); after each move it is rotated (reversed and
+# swapcased). Search: negamax alpha-beta, PVS, TT, null move, LMR, killers,
+# quiescence (captures/promotions; all evasions when in check), iterative
+# deepening under a fixed node budget. No clock, no randomness.
+import json,os,sys,urllib.request as U
+N,E,S,W=-10,1,10,-1
+R4=(N,E,S,W);B4=(N+E,S+E,S+W,N+W);K8=R4+B4
+NJ=(N+N+E,E+N+E,E+S+E,S+S+E,S+S+W,W+S+W,W+N+W,N+N+W)
+D={'N':NJ,'B':B4,'R':R4,'Q':K8,'K':K8}
+V={'P':100,'N':300,'B':320,'R':500,'Q':950,'K':0}
+LIM=25000
+MATE=99999
+T={}
+
+def tables(ph):
+ # piece-square tables (value included), tapered once per root by phase
+ # ph: 1.0 = full middlegame material, 0.0 = bare endgame
+ for p in V:
+  t=[0]*120
+  for r in range(8):
+   for c in range(8):
+    k=r+1;fx=abs(c-3.5);fy=abs(r-3.5);m=fx+fy;rk=7-r
+    if p=='P':
+     v=(0,0,3,8,16,30,55,0)[rk]*(2-ph)+(c in(3,4))*(1<rk<5)*14*ph-(c in(3,4))*(rk<2)*10*ph
+    elif p=='N':v=18-7*m-(rk==0)*8
+    elif p=='B':v=10-3*m-(rk==0)*6
+    elif p=='R':v=(rk==6)*18+(c in(3,4))*(rk==0)*6
+    elif p=='Q':v=4-2*m
+    else:v=ph*((rk==0)*(20,30,10,0,0,10,30,20)[c]-rk*16)+(1-ph)*(28-9*m)
+    t[k*10+10+c+1]=V[p]+round(v)
+  T[p]=t
+
+def rot(b):return b[::-1].swapcase()
+
+def att(b,s):
+ # is square s attacked by a lower-case (opponent) piece?
+ if b[s-11]=='p' or b[s-9]=='p':return 1
+ for d in NJ:
+  if b[s+d]=='n':return 1
+ for d in K8:
+  k=s+d;q=b[k]
+  if q=='k':return 1
+  while q=='.':k+=d;q=b[k]
+  if q=='q' or q==('r' if d in R4 else 'b'):return 1
+ return 0
+
+def gen(pos):
+ b,_,wc,bc,ep=pos
+ for i,p in enumerate(b):
+  if not p.isupper():continue
+  if p=='P':
+   L=[]
+   if b[i+N]=='.':
+    L.append(i+N)
+    if 80<i<89 and b[i+N+N]=='.':L.append(i+N+N)
+   for j in(i+N+W,i+N+E):
+    if b[j].islower() or j==ep:L.append(j)
+   for j in L:
+    if j<29:
+     for pr in'QNRB':yield(i,j,pr)
+    else:yield(i,j,'')
+   continue
+  for d in D[p]:
+   j=i+d
+   while 1:
+    q=b[j]
+    if q.isspace() or q.isupper():break
+    yield(i,j,'')
+    if q!='.' or p in'NK':break
+    j+=d
+  if p=='K':
+   for c,ok in((91,wc[0]),(98,wc[1])):
+    if ok and b[c]=='R':
+     d=1 if c>i else-1
+     if all(b[x]=='.'for x in range(i+d,c,d))and not att(b,i)and not att(b,i+d):yield(i,i+d+d,'')
+
+def put(b,i,p):return b[:i]+p+b[i+1:]
+
+def val(pos,m):
+ b=pos[0];i,j,pr=m;p=b[i];q=b[j];t=T[p]
+ s=t[j]-t[i]
+ if q!='.':s+=T[q.upper()][119-j]
+ if p=='K' and abs(j-i)==2:
+  r=91 if j<i else 98;s+=T['R'][(i+j)//2]-T['R'][r]
+ if p=='P':
+  if pr:s+=T[pr][j]-t[j]
+  if j==pos[4]:s+=T['P'][119-j-S]
+ return s
+
+def mk(pos,m):
+ # make a pseudo-legal move; None if it leaves our king attacked
+ b,sc,wc,bc,ep=pos;i,j,pr=m;p=b[i]
+ v=val(pos,m)
+ nb=put(put(b,j,pr or p),i,'.');ne=0
+ if i==91:wc=(0,wc[1])
+ if i==98:wc=(wc[0],0)
+ if j==21:bc=(bc[0],0)
+ if j==28:bc=(0,bc[1])
+ if p=='K':
+  wc=(0,0)
+  if abs(j-i)==2:
+   r=91 if j<i else 98;nb=put(put(nb,r,'.'),(i+j)//2,'R')
+ if p=='P':
+  if j-i==N+N:ne=119-i-N
+  if j==ep:nb=put(nb,j+S,'.')
+ if att(nb,nb.find('K')):return None
+ return(rot(nb),-sc-v,bc,wc,ne)
+
+def legal(pos):return[m for m in gen(pos)if mk(pos,m)]
+
+class Stop(Exception):pass
+
+class Search:
+ def __init__(s,hist):
+  s.tt={};s.kill={};s.n=0;s.rep=dict(hist)
+ def qs(s,pos,a,bt,ply):
+  s.n+=1
+  if s.n>LIM:raise Stop
+  b=pos[0];chk=att(b,b.find('K'))
+  if chk:best=-MATE+ply;ms=list(gen(pos))
+  else:
+   best=pos[1]
+   if best>=bt or ply>60:return best
+   if best>a:a=best
+   ms=[m for m in gen(pos)if b[m[1]]!='.'or m[2]=='Q'or m[1]==pos[4]]
+  ms.sort(key=lambda m:-V[b[m[1]].upper()]*10+V[b[m[0]]]-(m[2]=='Q')*900 if b[m[1]]!='.'else-(m[2]=='Q')*900)
+  for m in ms:
+   if not chk and b[m[1]]!='.'and pos[1]+V[b[m[1]].upper()]+200<a and not m[2]:continue
+   np=mk(pos,m)
+   if not np:continue
+   v=-s.qs(np,-bt,-a,ply+1)
+   if v>best:
+    best=v
+    if v>a:
+     a=v
+     if v>=bt:break
+  return best
+ def go(s,pos,d,a,bt,ply,nul=1):
+  s.n+=1
+  if s.n>LIM:raise Stop
+  b=pos[0]
+  if ply and s.rep.get(b):return 0
+  chk=att(b,b.find('K'))
+  if chk:d+=1
+  if d<=0:return s.qs(pos,a,bt,ply)
+  a0=a;e=s.tt.get(pos);tm=None
+  if e:
+   ed,es,ef,tm=e
+   if es>MATE-500:es-=ply
+   if es<500-MATE:es+=ply
+   if ed>=d and ply and(ef==0 or ef==1 and es>=bt or ef==2 and es<=a):return es
+  if nul and not chk and d>2 and pos[1]>=bt and abs(bt)<MATE-500 and any(c in b for c in'NBRQ'):
+   v=-s.go((rot(b),-pos[1],pos[3],pos[2],0),d-3,-bt,1-bt,ply+1,0)
+   if v>=bt:return v
+  k=s.kill.get(ply)
+  def key(m):
+   i,j,pr=m;q=b[j]
+   if m==tm:return-1e9
+   if q!='.':return-1e5-V[q.upper()]*10+V[b[i]]
+   if pr:return-9e4-V[pr]
+   if m==k:return-8e4
+   t=T[b[i]];return t[i]-t[j]
+  ms=sorted(gen(pos),key=key)
+  best=-MATE;bm=None;n=0
+  s.rep[b]=1
+  try:
+   for m in ms:
+    np=mk(pos,m)
+    if not np:continue
+    n+=1;q=b[m[1]]=='.'and not m[2]
+    if n==1:v=-s.go(np,d-1,-bt,-a,ply+1)
+    else:
+     r=1 if d>2 and n>3 and q and not chk else 0
+     if r and n>9 and d>4:r=2
+     v=-s.go(np,d-1-r,-a-1,-a,ply+1)
+     if v>a and(r or v<bt):v=-s.go(np,d-1,-bt,-a,ply+1)
+    if v>best:
+     best=v;bm=m
+     if ply==0:s.best=m
+     if v>a:
+      a=v
+      if v>=bt:
+       if q:s.kill[ply]=m
+       break
+  finally:
+   del s.rep[b]
+  if not n:return-MATE+ply if chk else 0
+  es=best
+  if es>MATE-500:es+=ply
+  if es<500-MATE:es-=ply
+  s.tt[pos]=(d,es,1 if best>=bt else 2 if best<=a0 else 0,bm)
+  return best
+
+def sq(i,w):
+ if not w:i=119-i
+ return'abcdefgh'[i%10-1]+str(10-i//10)
+
+def parse(f):
+ pl,side,cs,ep=f.split()[:4]
+ b='         \n'*2
+ for r in pl.split('/'):
+  b+=' '+''.join('.'*int(c)if c.isdigit()else c for c in r)+'\n'
+ b+='         \n'*2
+ w=side=='w'
+ e=0
+ if ep!='-':e=10*(10-int(ep[1]))+'abcdefgh'.index(ep[0])+1
+ pos=(b,0,('Q'in cs,'K'in cs),('k'in cs,'q'in cs),e)
+ if not w:pos=(rot(b),0,pos[3],pos[2],119-e if e else 0)
+ return pos,w
+
+def score(b):
+ return sum(T[p][i]for i,p in enumerate(b)if p.isupper())-sum(T[p.upper()][119-i]for i,p in enumerate(b)if p.islower())
+
+def think(fen,start,moves,legal_uci):
+ ph=sum(V[c.upper()]for c in fen.split()[0]if c in'nbrqNBRQ')
+ tables(min(ph,6400)/6400)
+ # repetition history from the game so far
+ p,w=parse(start);hist={}
+ for u in moves:
+  hist[p[0]]=1
+  for m in gen(p):
+   if sq(m[0],w)+sq(m[1],w)+m[2].lower()==u:p=mk(p,m);break
+  w=not w
+ pos,w=parse(fen);pos=(pos[0],score(pos[0]))+pos[2:]
+ rm=[m for m in gen(pos)if sq(m[0],w)+sq(m[1],w)+m[2].lower()in legal_uci and mk(pos,m)]
+ if not rm:return legal_uci[0]
+ if len(rm)==1:return sq(rm[0][0],w)+sq(rm[0][1],w)+rm[0][2].lower()
+ s=Search(hist);best=rm[0]
+ try:
+  for d in range(1,40):
+   s.best=None
+   s.go(pos,d,-MATE,MATE,0)
+   best=s.best or best
+ except Stop:
+  if s.best:best=s.best
+ if best not in rm:best=rm[0]
+ return sq(best[0],w)+sq(best[1],w)+best[2].lower()
+
+def post(path,o):
+ for _ in range(9):
+  try:
+   return json.load(U.urlopen(U.Request(os.environ['MAKEFUN_ENV_URL']+path,json.dumps(o).encode(),{'content-type':'application/json'})))
+  except U.HTTPError:return None
+  except Exception:pass
+ sys.exit(1)
+
+if __name__=='__main__':
+ g=post('/game',{});bad=0
+ while g['status']!='done':
+  if g['status']=='your_move':
+   m=g['legal_moves'][0]if bad else think(g['fen'],g['start_fen'],g['moves'],g['legal_moves'])
+   n=post('/move',{'game':g['game'],'move':m})
+   bad=n is None;g=n or post('/game',{})
+  else:g=post('/game',{})

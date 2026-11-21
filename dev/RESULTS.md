@@ -30,3 +30,11 @@ Doubling the search is worth about +200 Elo here, so speed / search efficiency c
 | v14 | v13 + stronger LMR | 64.0/96 | 1451 |
 
 v14 timing (dev tcal, LIM 350000, outside docker): middlegame worst 0.436 s mean 0.388 s; game positions worst 0.543 s; hard set worst 0.440 s.
+| v15c | v14 + two killers per ply | 60.0/96 | 1407 |
+| v15d | v14 + rooks on open/half-open files (cache keyed with rooks, ~20% slower) | 62.0/96 | 1429 |
+| v16 | v14 + king tropism toward the root's enemy king (side-specific tables) | 59.0/96 | 1397 |
+| v16b | same, tropism weights x2 | 60.0/96 | 1407 |
+| v17a | v14 + razoring (d<3) | 61.0/96 | 1418 |
+| v17b | v14 + smaller margins (RFP 85*d, futility 95*d) | 64.5/96 | 1457 |
+
+Rejected (no gain over v14 within noise): v15c, v15d, v16, v16b, v17a. A lazy MVV-LVA capture generator was slower (mean 0.388 s -> 0.457 s) and was dropped before any match.

@@ -159,7 +159,7 @@ class Search:
    if es>MATE-500:es-=ply
    if es<500-MATE:es+=ply
    if ed>=d and ply and(ef==0 or ef==1 and es>=bt or ef==2 and es<=a):return es
-  se=ev(pos)
+  se=0 if chk else ev(pos)
   if not chk and bt-a==1 and d<4 and se-110*d>=bt:return se
   if nul and not chk and d>2 and se>=bt and abs(bt)<MATE-500 and any(c in b for c in'NBRQ'):
    v=-s.go((rot(b),-pos[1],pos[3],pos[2],0),d-3,-bt,1-bt,ply+1,0)
